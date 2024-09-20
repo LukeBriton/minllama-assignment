@@ -96,7 +96,7 @@ class RMSNorm(torch.nn.Module):
         '''RMS = math.sqrt(MS.item())'''
         # g ∈ ℝⁿ is the gain parameter used to re-scale the standardized summed inputs,
         # and is set to 1 at the beginning.
-        '''normalized = x*self.weight/RMS'''
+        '''normalized = x/RMS''' # no need to time self.weight, cuz it's done in forward method
         
         # https://github.com/meta-llama/llama/blob/main/llama/model.py
         # Tensor dim >= 1, vector(s)
