@@ -43,8 +43,69 @@ class RMSNorm(torch.nn.Module):
         Returns:
             torch.Tensor: The normalized tensor.
         """
+
+        '''
+        4 RMSNorm
+        A well-known explanation of the success of LayerNorm is its re-centering and re-scaling invariance
+        property. The former enables the model to be insensitive to shift noises on both inputs and weights,
+        and the latter keeps the output representations intact when both inputs and weights are randomly
+        scaled. In this paper, we hypothesize that the re-scaling invariance is the reason for success of
+        LayerNorm, rather than re-centering invariance.
+
+        We propose RMSNorm which only focuses on re-scaling invariance and regularizes the summed
+        inputs simply according to the root mean square (RMS) statistic:
+
+        6.1 Machine Translation
+        In short, both LayerNorm and RMSNorm outperform the Baseline by accelerating model convergence:
+        they reduce the number of training steps until convergence by about 50%, and improve test accuracy,
+        with RMSNorm being comparable to LayerNorm. This supports our hypothesis that re-scaling invariance
+        is the core property of LayerNorm, and that RMSNorm is an effective substitute. Our results with
+        L2-Norm show that it fails to improve the model.
+
+        Due to their normalization properties, both RMSNorm and LayerNorm stabilize standard deviation.
+        Although the mean in RMSNorm is not normalized, in practice it is more stable than the mean of the baseline.
+        This supports our hypothesis that RMSNorm stabilizes recurrent activations without the need to explicitly
+        normalize the mean.
+
+        Results in Figure 4 show that LayerNorm becomes very unstable with abnormal initialization,
+        but RMSNorm is more robust (both underperform the original initialization). Our empirical evidence
+        so far suggests that RMSNorm is similarly robust as LayerNorm, or more.
+        '''
         # todo
-        raise NotImplementedError
+        '''
+        cf. https://pytorch.org/docs/stable/_modules/torch/nn/modules/normalization.html#LayerNorm
+        
+        The mean and standard-deviation are calculated over the last `D` dimensions, where `D`
+        is the dimension of :attr:`normalized_shape`. For example, if :attr:`normalized_shape`
+        is ``(3, 5)`` (a 2-dimensional shape), the mean and standard-deviation are computed over
+        the last 2 dimensions of the input (i.e. ``input.mean((-2, -1))``).
+        :math:`\gamma` and :math:`\beta` are learnable affine transform parameters of
+        :attr:`normalized_shape` if :attr:`elementwise_affine` is ``True``.
+        The standard-deviation is calculated via the biased estimator, equivalent to
+        `torch.var(input, unbiased=False)`.
+        '''
+        # Tensor dim = 1, single vector (Eeasier to understand imo)
+        # https://pytorch.org/docs/stable/generated/torch.sum.html
+        # torch.sum(x)
+        # https://stackoverflow.com/questions/52772534/what-does-the-1-mean-in-tensor-size-1
+        # x.size(-1)
+        # Assume we are dealing with a vector, not vectors.
+        '''MS = torch.sum(torch.square(x))/x.size(-1) + self.eps'''
+        # https://stackoverflow.com/questions/57727372/how-do-i-get-the-value-of-a-tensor-in-pytorch
+        # https://stackoverflow.com/questions/47588682/how-to-cast-a-1-d-inttensor-to-int-in-pytorch
+        '''RMS = math.sqrt(MS.item())'''
+        # g ∈ ℝⁿ is the gain parameter used to re-scale the standardized summed inputs,
+        # and is set to 1 at the beginning.
+        '''normalized = x*self.weight/RMS'''
+        
+        # https://github.com/meta-llama/llama/blob/main/llama/model.py
+        # Tensor dim >= 1, vector(s)
+        # https://pytorch.org/docs/stable/generated/torch.mean.html
+        # If keepdim is True, the output tensor is of the same size as input except in the dimension(s) dim
+        # where it is of size 1. Otherwise, dim is squeezed (see torch.squeeze()),
+        # resulting in the output tensor having 1 (or len(dim)) fewer dimension(s).
+        normalized = x*torch.rsqrt(torch.square(x).mean(-1, keepdim=True)+self.eps)
+        return normalized
 
     def forward(self, x):
         """
