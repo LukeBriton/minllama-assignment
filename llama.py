@@ -311,7 +311,17 @@ class LlamaLayer(nn.Module):
            output of the feed-forward network
         '''
         # todo
-        raise NotImplementedError
+        # prenorm version of the architecture
+        # cf. SLP 9.2 Transformer Blocks
+        # https://github.com/meta-llama/llama/blob/main/llama/model.py offers one a little more complicated
+        residual = x
+        input_normalized = self.attention_norm(x)       # input of Layer Norm before MultiHead Attention
+        multiheaded = self.attention(input_normalized) 
+        residual = residual + multiheaded
+        input_normalized = self.ffn_norm(residual)      # input of Layer Norm before FFN
+        FFNed = self.feed_forward(input_normalized)
+        residual = residual + FFNed
+        return residual
 
 class Llama(LlamaPreTrainedModel):
     def __init__(self, config: LlamaConfig):
