@@ -155,7 +155,60 @@ class Attention(nn.Module):
         attention matrix before applying it to the value tensor.
         '''
         # todo
-        raise NotImplementedError
+        # Attention(Q,K,V) = \softmax(QKᵀ/√d)·V
+        '''
+        Dot-product attention is identical to our algorithm, except for the scaling factor.
+        Additive attention computes the compatibility function using a feed-forward network with
+        a single hidden layer.
+        While the two are similar in theoretical complexity, dot-product attention is
+        much faster and more space-efficient in practice, since it can be implemented using highly optimized
+        matrix multiplication code.
+        '''
+        # https://discuss.pytorch.org/t/implicit-dimension-choice-for-softmax-warning/12314
+        # if output = softmax(input,dim=2)
+        # then output.sum(dim=2) is all 1
+        # >>> a = Variable(torch.randn(5,2))
+        # >>> F.softmax(a, dim=1)
+        # Variable containing:
+        # 0.6360  0.3640
+        # 0.3541  0.6459
+        # 0.2412  0.7588
+        # 0.0860  0.9140
+        # 0.6258  0.3742
+        # [torch.FloatTensor of size 5x2]
+
+        # >>> F.softmax(a, dim=0)
+        # Variable containing:
+        # 0.6269  0.3177
+        # 0.0543  0.0877
+        # 0.1482  0.4128
+        # 0.0103  0.0969
+        # 0.1603  0.0849
+        # [torch.FloatTensor of size 5x2]
+
+        ''' test
+        query = torch.randn(2, 3, 4, 5)
+        key = torch.randn(2, 3, 4, 5)
+        value = torch.randn(2, 3, 4, 5)
+        '''
+
+        # https://github.com/meta-llama/llama/blob/main/llama/model.py
+        ''' For reference, I only got to find to use matmul rather than bmm.
+        scores = torch.matmul(query, key.transpose(2, 3)) / math.sqrt(key.size(-1))
+        scores = F.softmax(scores.float(), dim=-1).type_as(query)
+        output = torch.matmul(scores, value)  # (bs, n_local_heads, seqlen, head_dim)
+        '''
+
+        # https://pytorch.org/docs/stable/generated/torch.bmm.html
+        # input and mat2 must be 3-D tensors each containing the same number of matrices.
+        # https://pytorch.org/docs/stable/generated/torch.matmul.html#torch.matmul
+        # If both arguments are at least 1-dimensional and at least one argument is N-dimensional (where N > 2),
+        # then a batched matrix multiply is returned. 
+        K_transpose = torch.transpose(key, 2, 3)
+        # TypeError: sqrt(): argument 'input' (position 1) must be Tensor, not int # torch.sqrt()
+        softmaxed = F.softmax(torch.matmul(query, K_transpose) / math.sqrt(key.size(-1)), -1)
+        QKVscores = torch.matmul(softmaxed, value) 
+        return QKVscores
 
     def forward(
         self,
